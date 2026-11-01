@@ -7,6 +7,6 @@ sentencepiece
 indic-transliteration
 pandas
 safetune
-"curatorkit[all]"
-"auditkit[transformers]"
+curatorkit[all]
+auditkit[transformers]
 circuitkit
