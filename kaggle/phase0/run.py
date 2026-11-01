@@ -33,14 +33,21 @@ if sh("pip install -q -r requirements.txt > /tmp/pip.log 2>&1"):
     sh("tail -n 15 /tmp/pip.log")
     sh("pip install -q -U transformers accelerate datasets huggingface_hub")
 
-try:
-    from kaggle_secrets import UserSecretsClient
-    from huggingface_hub import login
+from huggingface_hub import login
 
-    login(UserSecretsClient().get_secret("HF_TOKEN"))
+# Secrets are not available to runs started from the CLI, so the token comes
+# from a private dataset (krushnad523/hf-token); the secret is a fallback for UI runs.
+TOKEN_FILE = "/kaggle/input/hf-token/hf_token.txt"
+try:
+    if os.path.exists(TOKEN_FILE):
+        token = open(TOKEN_FILE).read().strip()
+    else:
+        from kaggle_secrets import UserSecretsClient
+        token = UserSecretsClient().get_secret("HF_TOKEN")
+    login(token)
     print("Logged in to Hugging Face")
 except Exception as e:
-    print(f"HF login failed (attach the HF_TOKEN secret to this notebook): {e}")
+    print(f"HF login failed (add the private hf-token dataset): {e}")
     sys.exit(1)
 
 os.environ.setdefault("HF_USER", "kdt523")
