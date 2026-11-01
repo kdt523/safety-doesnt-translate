@@ -1,0 +1,12 @@
+torch
+transformers>=4.56
+accelerate
+datasets
+huggingface_hub
+sentencepiece
+indic-transliteration
+pandas
+safetune
+"curatorkit[all]"
+"auditkit[transformers]"
+circuitkit

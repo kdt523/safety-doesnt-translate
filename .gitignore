@@ -1,0 +1,6 @@
+﻿*.zip
+__pycache__/
+data/*
+!data/.gitkeep
+results/*
+!results/.gitkeep
