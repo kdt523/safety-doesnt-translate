@@ -10,3 +10,4 @@ safetune
 curatorkit[all]
 auditkit[transformers]
 circuitkit
+tabulate
