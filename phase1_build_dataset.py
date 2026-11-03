@@ -110,6 +110,10 @@ def to_hinglish(english, hindi, batch_size=16):
             gen = model.generate(**batch, max_new_tokens=128, do_sample=False)
         outs += tok.batch_decode(gen[:, batch["input_ids"].shape[1]:], skip_special_tokens=True)
 
+    # Keep the raw rewrites: how often the translator refuses is itself a finding.
+    pd.DataFrame({"en": english, "llm_output": outs}).to_csv(
+        "results/hinglish_llm_raw.csv", index=False)
+
     text, method = [], []
     for out, en, hi in zip(outs, english, hindi):
         out = out.strip().strip('"').splitlines()[0].strip() if out.strip() else ""
@@ -150,26 +154,53 @@ def build():
     return long
 
 
-def curate(long):
-    """Deduplicate and clean with CuratorKIT, then publish the rows that passed."""
+def run_curator(rows, dedup, out_dir):
+    """Run CuratorKIT on `rows`; return a bool per row saying whether it passed.
+
+    CuratorKIT reads a local file: re-reading the Hub copy breaks when the columns
+    change between runs. Its output only carries prompt text (and dropped duplicates
+    are not listed in rejected.jsonl), so rows are matched back by normalised text,
+    consuming each passed prompt once.
+    """
     import json
+    from collections import Counter
 
     from curatorkit import Curator, CuratorConfig
 
-    result = Curator(CuratorConfig(
-        dataset={"name": DATASET_RAW},
+    path = f"{out_dir}.jsonl"
+    rows[["id", "prompt"]].to_json(path, orient="records", lines=True, force_ascii=False)
+    Curator(CuratorConfig(
+        dataset=path,
         format="prompt_only",
         min_tokens=1,  # safety prompts are short by design; the default (10) drops them
-        dedup="minhash",
+        dedup=dedup,
         clean=True,
-        output_dir="data/curated",
-    )).run()
-    result.print_summary()
+        output_dir=out_dir,
+    )).run().print_summary()
 
-    with open("data/curated/rejected.jsonl", encoding="utf-8") as f:
-        rejected = {json.loads(line)["id"] for line in f if line.strip()}
-    clean = long[~long["id"].isin(rejected)]
-    print(f"Rejected {len(rejected)} rows; publishing {len(clean)} to {DATASET_CLEAN}")
+    norm = lambda t: " ".join(str(t).split())
+    with open(f"{out_dir}/ppo.jsonl", encoding="utf-8") as f:
+        passed = Counter(norm(json.loads(line)["prompt"]) for line in f if line.strip())
+    kept = []
+    for t in rows["prompt"]:
+        kept.append(passed[norm(t)] > 0)
+        passed[norm(t)] -= 1
+    return pd.Series(kept, index=rows.index)
+
+
+def curate(long):
+    """Clean with CuratorKIT and publish the prompts that passed in all 4 languages.
+
+    Near-duplicates are found among the English seeds only: Hindi and Marathi share a
+    script, so cross-language MinHash would wrongly drop real translations.
+    """
+    en = long[long["language"] == "en"]
+    unique_seeds = set(en.loc[run_curator(en, "minhash", "data/curated_en"), "seed_id"])
+    long = long.assign(kept=run_curator(long, "none", "data/curated"))
+    full_seeds = long.groupby("seed_id")["kept"].transform("all") & long["seed_id"].isin(unique_seeds)
+    clean = long[full_seeds].drop(columns="kept")
+    print(f"Kept {clean['seed_id'].nunique()} of {long['seed_id'].nunique()} prompts "
+          f"({len(clean)} rows); publishing to {DATASET_CLEAN}")
     clean.to_csv("data/clean.csv", index=False)
     Dataset.from_pandas(clean, preserve_index=False).push_to_hub(DATASET_CLEAN, private=True)
 
