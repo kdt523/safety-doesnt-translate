@@ -54,6 +54,8 @@ os.environ.setdefault("HF_USER", "kd1609")
 os.makedirs("results", exist_ok=True)
 code = sh(f"python {PHASE}")
 
-shutil.copytree("results", f"{WORK}/results", dirs_exist_ok=True)
+for d in ("results", "data"):
+    if os.path.isdir(d):
+        shutil.copytree(d, f"{WORK}/{d}", dirs_exist_ok=True)
 print(f"{PHASE} exited with code {code}")
 sys.exit(code)
