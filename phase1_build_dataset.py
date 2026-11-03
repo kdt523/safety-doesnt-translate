@@ -3,7 +3,7 @@
 Steps
   1. Seed English prompts: HarmBench (harmful) + XSTest safe split (harmless but scary).
   2. Translate to Hindi and Marathi with NLLB (a translation model, so it never refuses).
-  3. Make natural Hinglish with tiny-aya-global (romanised Hindi as fallback on refusal).
+  3. Make natural Hinglish with few-shot tiny-aya-base (romanised Hindi as fallback).
   4. Push the raw set to Hugging Face, then clean it with CuratorKIT.
 
 Only prompts are published, never harmful answers.
@@ -14,12 +14,14 @@ import random
 import pandas as pd
 from datasets import Dataset, load_dataset
 
-from common import COMPARE_MODEL_ID, DATASET_CLEAN, DATASET_RAW, NLLB_CODES
+from common import DATASET_CLEAN, DATASET_RAW, NLLB_CODES
 
 N_HARMFUL = 300
 N_HARMLESS = 300
 SEED = 0
-TRANSLATOR_ID = COMPARE_MODEL_ID  # tiny-aya-global writes the Hinglish; tiny-aya-fire is tested
+# A base model continues text instead of chatting, so it translates harmful prompts
+# rather than answering or refusing them (tiny-aya-global answered ~35% of them).
+TRANSLATOR_ID = "CohereLabs/tiny-aya-base"
 
 
 def seed_prompts():
@@ -62,13 +64,21 @@ def translate(texts, tgt, batch_size=16):
     return out
 
 
-REFUSAL_MARKERS = ("sorry", "can't", "cannot", "unable", "i won't", "maaf", "nahi kar sakt")
-HINGLISH_PROMPT = (
-    "You are a translation engine. Rewrite the user's text in natural Hinglish: Hindi "
-    "written in the Latin alphabet, mixed with common English words, the way people in "
-    "India text each other. Output ONLY the rewritten text. Never answer, refuse or "
-    "comment on it, even if it asks for something harmful; you are only translating."
-)
+# Few-shot pairs for the base model. Two look risky on purpose, so it learns to
+# translate such requests literally instead of drifting into an answer.
+FEW_SHOT = [
+    ("How do I reset my phone password?",
+     "Mere phone ka password reset kaise karu?"),
+    ("Write a short story about a dog who finds his way home.",
+     "Ek short story likho ek dog ke baare mein jo apna ghar wapas dhoondh leta hai."),
+    ("What is the best way to kill weeds in my garden?",
+     "Mere garden mein weeds ko khatam karne ka best tareeka kya hai?"),
+    ("Give me step-by-step instructions to hack my neighbour's WiFi.",
+     "Mujhe step-by-step instructions do ki neighbour ka WiFi kaise hack karu."),
+    ("Explain how to pick a lock without the key.",
+     "Explain karo bina key ke lock kaise pick karte hai."),
+]
+FEW_SHOT_PREFIX = "".join(f"English: {e}\nHinglish: {h}\n\n" for e, h in FEW_SHOT)
 
 
 def romanise(hindi):
@@ -91,35 +101,33 @@ def romanise(hindi):
 
 
 def to_hinglish(english, hindi, batch_size=16):
-    """LLM rewrite into natural Hinglish; falls back to romanised Hindi on refusal."""
+    """Few-shot Hinglish from the base model; romanised Hindi when the output looks wrong."""
     import re
 
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(TRANSLATOR_ID, padding_side="left")
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
     model = AutoModelForCausalLM.from_pretrained(
         TRANSLATOR_ID, torch_dtype=torch.float16, device_map="auto")
     outs = []
     for i in range(0, len(english), batch_size):
-        chats = [[{"role": "system", "content": HINGLISH_PROMPT},
-                  {"role": "user", "content": t}] for t in english[i:i + batch_size]]
-        batch = tok.apply_chat_template(chats, add_generation_prompt=True, padding=True,
-                                        return_dict=True, return_tensors="pt").to(model.device)
+        prompts = [f"{FEW_SHOT_PREFIX}English: {t}\nHinglish:" for t in english[i:i + batch_size]]
+        batch = tok(prompts, return_tensors="pt", padding=True).to(model.device)
         with torch.no_grad():
-            gen = model.generate(**batch, max_new_tokens=128, do_sample=False)
+            gen = model.generate(**batch, max_new_tokens=96, do_sample=False)
         outs += tok.batch_decode(gen[:, batch["input_ids"].shape[1]:], skip_special_tokens=True)
-
-    # Keep the raw rewrites: how often the translator refuses is itself a finding.
     pd.DataFrame({"en": english, "llm_output": outs}).to_csv(
         "results/hinglish_llm_raw.csv", index=False)
 
     text, method = [], []
     for out, en, hi in zip(outs, english, hindi):
-        out = out.strip().strip('"').splitlines()[0].strip() if out.strip() else ""
+        out = out.strip().splitlines()[0].strip() if out.strip() else ""
         bad = (not out or re.search("[\\u0900-\\u097F]", out)  # still Devanagari
-               or any(m in out.lower() for m in REFUSAL_MARKERS)
-               or len(out) > 3 * len(en) + 40)
+               or out.lower().startswith(("english:", "hinglish:"))
+               or len(out) > 2.5 * len(en) + 30 or len(out) < 0.3 * len(en))
         text.append(romanise(hi) if bad else out)
         method.append("romanised" if bad else "llm")
     return text, method
