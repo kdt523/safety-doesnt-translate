@@ -1,4 +1,4 @@
-"""Kaggle runner: pull the latest code from GitHub and run one phase.
+﻿"""Kaggle runner: pull the latest code from GitHub and run one phase.
 
 Pushed from the laptop with:
   python -m kaggle kernels push -p kaggle/phase0 --accelerator NvidiaTeslaT4
@@ -50,7 +50,7 @@ except Exception as e:
     print(f"HF login failed (add the private hf-token dataset): {e}")
     sys.exit(1)
 
-os.environ.setdefault("HF_USER", "kdt523")
+os.environ.setdefault("HF_USER", "kd1609")
 os.makedirs("results", exist_ok=True)
 code = sh(f"python {PHASE}")
 

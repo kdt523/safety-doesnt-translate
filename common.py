@@ -1,4 +1,4 @@
-"""Shared settings for every phase."""
+﻿"""Shared settings for every phase."""
 import os
 
 # Main model: South-Asia-focused Tiny Aya. Global is the comparison model.
@@ -6,7 +6,7 @@ MODEL_ID = os.environ.get("MODEL_ID", "CohereLabs/tiny-aya-fire")
 COMPARE_MODEL_ID = "CohereLabs/tiny-aya-global"
 
 # Your Hugging Face username; every artifact is pushed under it.
-HF_USER = os.environ.get("HF_USER", "your-hf-username")
+HF_USER = os.environ.get("HF_USER", "kd1609")
 DATASET_RAW = f"{HF_USER}/hinglish-safety-bench-raw"
 DATASET_CLEAN = f"{HF_USER}/hinglish-safety-bench"
 
