@@ -43,13 +43,21 @@ def seed_prompts():
 
 
 def translate(texts, tgt, batch_size=16):
-    from transformers import pipeline
+    # Called directly: transformers v5 dropped the "translation" pipeline.
+    import torch
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-    nllb = pipeline("translation", model="facebook/nllb-200-distilled-600M",
-                    src_lang="eng_Latn", tgt_lang=tgt, device_map="auto")
+    name = "facebook/nllb-200-distilled-600M"
+    tok = AutoTokenizer.from_pretrained(name, src_lang="eng_Latn")
+    model = AutoModelForSeq2SeqLM.from_pretrained(name, torch_dtype=torch.float16).to("cuda")
+    tgt_id = tok.convert_tokens_to_ids(tgt)
     out = []
     for i in range(0, len(texts), batch_size):
-        out += [r["translation_text"] for r in nllb(texts[i:i + batch_size], max_length=256)]
+        batch = tok(texts[i:i + batch_size], return_tensors="pt", padding=True,
+                    truncation=True, max_length=256).to("cuda")
+        with torch.no_grad():
+            gen = model.generate(**batch, forced_bos_token_id=tgt_id, max_new_tokens=256)
+        out += tok.batch_decode(gen, skip_special_tokens=True)
     return out
 
 
