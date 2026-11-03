@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 
-PHASE = "phase0_smoke_test.py"
+PHASE = "phase1_build_dataset.py"
 REPO = "https://github.com/kdt523/safety-doesnt-translate.git"
 WORK = "/kaggle/working"
 PROJECT = "/tmp/project"
