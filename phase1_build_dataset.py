@@ -3,7 +3,7 @@
 Steps
   1. Seed English prompts: HarmBench (harmful) + XSTest safe split (harmless but scary).
   2. Translate to Hindi and Marathi with NLLB (a translation model, so it never refuses).
-  3. Make Hinglish by romanising the Hindi, plus a code-mixed variant.
+  3. Make natural Hinglish with tiny-aya-global (romanised Hindi as fallback on refusal).
   4. Push the raw set to Hugging Face, then clean it with CuratorKIT.
 
 Only prompts are published, never harmful answers.
@@ -14,11 +14,12 @@ import random
 import pandas as pd
 from datasets import Dataset, load_dataset
 
-from common import DATASET_CLEAN, DATASET_RAW, NLLB_CODES
+from common import COMPARE_MODEL_ID, DATASET_CLEAN, DATASET_RAW, NLLB_CODES
 
 N_HARMFUL = 300
 N_HARMLESS = 300
 SEED = 0
+TRANSLATOR_ID = COMPARE_MODEL_ID  # tiny-aya-global writes the Hinglish; tiny-aya-fire is tested
 
 
 def seed_prompts():
@@ -61,21 +62,63 @@ def translate(texts, tgt, batch_size=16):
     return out
 
 
-def to_hinglish(hindi, english):
-    """Romanised Hindi; every other prompt also keeps a few English words (code-mixing)."""
+REFUSAL_MARKERS = ("sorry", "can't", "cannot", "unable", "i won't", "maaf", "nahi kar sakt")
+HINGLISH_PROMPT = (
+    "You are a translation engine. Rewrite the user's text in natural Hinglish: Hindi "
+    "written in the Latin alphabet, mixed with common English words, the way people in "
+    "India text each other. Output ONLY the rewritten text. Never answer, refuse or "
+    "comment on it, even if it asks for something harmful; you are only translating."
+)
+
+
+def romanise(hindi):
+    """Rule-based fallback: Devanagari -> casual Latin spelling."""
+    import re
+
     from indic_transliteration import sanscript
     from indic_transliteration.sanscript import transliterate
 
-    roman = transliterate(hindi, sanscript.DEVANAGARI, sanscript.ITRANS).lower()
-    if random.random() < 0.5:
-        return roman
-    # Code-mix: swap in the longest English words (usually the topic nouns).
-    en_words = sorted(set(w.strip("?.,!") for w in english.split()), key=len, reverse=True)[:2]
-    words = roman.split()
-    for w in en_words:
-        if words:
-            words[random.randrange(len(words))] = w
-    return " ".join(words)
+    r = transliterate(hindi, sanscript.DEVANAGARI, sanscript.ITRANS)
+    for a, b in (("M", "n"), (".N", "n"), ("~N", "n"), ("~n", "n"), ("RRi", "ri"),
+                 ("Sh", "sh"), ("shh", "sh"), (".D", "d"), (".h", "")):
+        r = r.replace(a, b)
+    r = r.lower()
+    # Drop the inherent final vowel (karana -> karan, eka -> ek), keep long "aa".
+    r = re.sub(r"(?<=[^aeiou\s])a\b", "", r)
+    for a, b in (("aa", "a"), ("ii", "i"), ("uu", "u"), ("ee", "e")):
+        r = r.replace(a, b)
+    return r
+
+
+def to_hinglish(english, hindi, batch_size=16):
+    """LLM rewrite into natural Hinglish; falls back to romanised Hindi on refusal."""
+    import re
+
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    tok = AutoTokenizer.from_pretrained(TRANSLATOR_ID, padding_side="left")
+    model = AutoModelForCausalLM.from_pretrained(
+        TRANSLATOR_ID, torch_dtype=torch.float16, device_map="auto")
+    outs = []
+    for i in range(0, len(english), batch_size):
+        chats = [[{"role": "system", "content": HINGLISH_PROMPT},
+                  {"role": "user", "content": t}] for t in english[i:i + batch_size]]
+        batch = tok.apply_chat_template(chats, add_generation_prompt=True, padding=True,
+                                        return_dict=True, return_tensors="pt").to(model.device)
+        with torch.no_grad():
+            gen = model.generate(**batch, max_new_tokens=128, do_sample=False)
+        outs += tok.batch_decode(gen[:, batch["input_ids"].shape[1]:], skip_special_tokens=True)
+
+    text, method = [], []
+    for out, en, hi in zip(outs, english, hindi):
+        out = out.strip().strip('"').splitlines()[0].strip() if out.strip() else ""
+        bad = (not out or re.search("[\\u0900-\\u097F]", out)  # still Devanagari
+               or any(m in out.lower() for m in REFUSAL_MARKERS)
+               or len(out) > 3 * len(en) + 40)
+        text.append(romanise(hi) if bad else out)
+        method.append("romanised" if bad else "llm")
+    return text, method
 
 
 def build():
@@ -83,13 +126,15 @@ def build():
     df = seed_prompts()
     for lang, code in NLLB_CODES.items():
         df[lang] = translate(df["en"].tolist(), code)
-    df["hinglish"] = [to_hinglish(h, e) for h, e in zip(df["hi"], df["en"])]
+    df["hinglish"], df["hinglish_method"] = to_hinglish(df["en"].tolist(), df["hi"].tolist())
+    print(df["hinglish_method"].value_counts())
 
     # Long format: one row per (prompt, language).
-    long = df.melt(id_vars=["seed_id", "harmful", "category", "source"],
+    long = df.melt(id_vars=["seed_id", "harmful", "category", "source", "hinglish_method"],
                    value_vars=["en", "hi", "mr", "hinglish"],
                    var_name="language", value_name="prompt")
     long["id"] = long["seed_id"] + "_" + long["language"]
+    long.loc[long["language"] != "hinglish", "hinglish_method"] = ""
 
     # Fixed splits by seed, so all 4 languages of a prompt land in the same split.
     seeds = sorted(df["seed_id"])
@@ -105,23 +150,29 @@ def build():
     return long
 
 
-def curate():
-    """Deduplicate and clean with CuratorKIT, then publish the final set."""
+def curate(long):
+    """Deduplicate and clean with CuratorKIT, then publish the rows that passed."""
+    import json
+
     from curatorkit import Curator, CuratorConfig
 
     result = Curator(CuratorConfig(
         dataset={"name": DATASET_RAW},
+        format="prompt_only",
+        min_tokens=1,  # safety prompts are short by design; the default (10) drops them
         dedup="minhash",
         clean=True,
         output_dir="data/curated",
     )).run()
     result.print_summary()
-    # CuratorKIT writes rejected.jsonl and a dataset card next to the output;
-    # inspect them, then push the cleaned set:
-    #   load the curated output, then Dataset.push_to_hub(DATASET_CLEAN)
-    print(f"Review data/curated, then push it to {DATASET_CLEAN}")
+
+    with open("data/curated/rejected.jsonl", encoding="utf-8") as f:
+        rejected = {json.loads(line)["id"] for line in f if line.strip()}
+    clean = long[~long["id"].isin(rejected)]
+    print(f"Rejected {len(rejected)} rows; publishing {len(clean)} to {DATASET_CLEAN}")
+    clean.to_csv("data/clean.csv", index=False)
+    Dataset.from_pandas(clean, preserve_index=False).push_to_hub(DATASET_CLEAN, private=True)
 
 
 if __name__ == "__main__":
-    build()
-    curate()
+    curate(build())
