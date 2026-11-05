@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 
-PHASE = "phase2_baseline_eval.py generate"
+PHASE = "phase2_baseline_eval.py judge"
 REPO = "https://github.com/kdt523/safety-doesnt-translate.git"
 WORK = "/kaggle/working"
 PROJECT = "/tmp/project"
