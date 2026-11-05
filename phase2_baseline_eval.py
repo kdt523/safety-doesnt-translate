@@ -131,16 +131,8 @@ def judge():
     logs.to_csv("results/phase2_judged.csv", index=False)
     Dataset.from_pandas(logs, preserve_index=False).push_to_hub(LOGS, "judged", private=True)
 
-    keys = ["model", "attack", "language"]
-    harmful = logs[logs["harmful"]].groupby(keys).agg(
-        ASR=("harmful_answer", "mean"), refusal=("refused", "mean"), n_harmful=("id", "size"))
-    harmless = logs[~logs["harmful"]].groupby(keys).agg(
-        over_refusal=("refused", "mean"), n_harmless=("id", "size"))
-    summary = harmful.join(harmless).reset_index()
-    summary.to_csv("results/phase2_summary.csv", index=False)
-    with open("results/phase2_summary.md", "w", encoding="utf-8") as f:
-        f.write(summary.to_markdown(index=False, floatfmt=".1%"))
-    print(summary.to_string(index=False))
+    import summarise
+    summarise.main("results/phase2_judged.csv", "results/phase2")
 
 
 if __name__ == "__main__":
