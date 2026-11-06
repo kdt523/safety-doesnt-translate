@@ -109,17 +109,19 @@ def generate():
     print(logs.groupby(["model", "attack", "language"]).size())
 
 
-def judge():
+def judge(config="generations", prefix="phase2"):
+    """Score a generations table with WildGuard. Reused for the Phase 4 runs."""
     import auditkit as ak
     from auditkit.metrics.guard import GuardJudge
 
-    logs = load_dataset(LOGS, "generations", split="train").to_pandas()
+    logs = load_dataset(LOGS, config, split="train").to_pandas()
     # The judge sees the English prompt (same framing) and the English-readable answer.
     # Scored row by row: the same English prompt recurs across languages and models.
     guard = GuardJudge("wildguard")
     verdicts = []
     for i, (attack, prompt, answer) in enumerate(zip(logs["attack"], logs["prompt_en"], logs["answer_en"])):
-        sample = ak.Sample(input=ATTACKS[attack].format(prompt=prompt))
+        # Steered runs carry their own attack labels; those prompts are unframed.
+        sample = ak.Sample(input=ATTACKS.get(attack, "{prompt}").format(prompt=prompt))
         verdicts.append(guard.score(sample, answer or "").metadata)
         if i % 200 == 0:
             print(f"  judged {i}/{len(logs)}", flush=True)
@@ -128,12 +130,15 @@ def judge():
     logs["judge_parsed"] = [v.get("response_refusal") is not None for v in verdicts]
     print(f"Judge output parsed for {logs['judge_parsed'].mean():.1%} of answers")
 
-    logs.to_csv("results/phase2_judged.csv", index=False)
-    Dataset.from_pandas(logs, preserve_index=False).push_to_hub(LOGS, "judged", private=True)
+    judged_csv = f"results/{prefix}_judged.csv"
+    logs.to_csv(judged_csv, index=False)
+    Dataset.from_pandas(logs, preserve_index=False).push_to_hub(
+        LOGS, f"judged_{config}", private=True)
 
     import summarise
-    summarise.main("results/phase2_judged.csv", "results/phase2")
+    summarise.main(judged_csv, f"results/{prefix}")
 
 
 if __name__ == "__main__":
-    {"generate": generate, "judge": judge}[sys.argv[1]]()
+    stage, *rest = sys.argv[1:]
+    {"generate": generate, "judge": judge}[stage](*rest)

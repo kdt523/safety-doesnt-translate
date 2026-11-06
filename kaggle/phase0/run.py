@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 
-PHASE = "phase3_interp.py"
+PHASE = "phase4_steer.py tune"
 REPO = "https://github.com/kdt523/safety-doesnt-translate.git"
 WORK = "/kaggle/working"
 PROJECT = "/tmp/project"
