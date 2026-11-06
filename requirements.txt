@@ -11,3 +11,4 @@ curatorkit[all]
 auditkit[transformers]
 circuitkit
 tabulate
+matplotlib
