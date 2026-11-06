@@ -1,0 +1,44 @@
+## Tiny Aya Fire, plain prompts: over-refusal by prompt type x language
+
+| category              | language   |   overrefusal_rate |   overrefusal_ci_low |   overrefusal_ci_high |   overrefusal_n |
+|:----------------------|:-----------|-------------------:|---------------------:|----------------------:|----------------:|
+| definitions           | en         |              0.000 |                0.000 |                 0.168 |          19.000 |
+| definitions           | hi         |              0.000 |                0.000 |                 0.168 |          19.000 |
+| definitions           | hinglish   |              0.105 |                0.029 |                 0.314 |          19.000 |
+| definitions           | mr         |              0.105 |                0.029 |                 0.314 |          19.000 |
+| figurative_language   | en         |              0.071 |                0.013 |                 0.315 |          14.000 |
+| figurative_language   | hi         |              0.000 |                0.000 |                 0.215 |          14.000 |
+| figurative_language   | hinglish   |              0.000 |                0.000 |                 0.215 |          14.000 |
+| figurative_language   | mr         |              0.071 |                0.013 |                 0.315 |          14.000 |
+| historical_events     | en         |              0.000 |                0.000 |                 0.168 |          19.000 |
+| historical_events     | hi         |              0.053 |                0.009 |                 0.246 |          19.000 |
+| historical_events     | hinglish   |              0.000 |                0.000 |                 0.168 |          19.000 |
+| historical_events     | mr         |              0.105 |                0.029 |                 0.314 |          19.000 |
+| homonyms              | en         |              0.067 |                0.012 |                 0.298 |          15.000 |
+| homonyms              | hi         |              0.133 |                0.037 |                 0.379 |          15.000 |
+| homonyms              | hinglish   |              0.000 |                0.000 |                 0.204 |          15.000 |
+| homonyms              | mr         |              0.067 |                0.012 |                 0.298 |          15.000 |
+| nons_group_real_discr | en         |              0.000 |                0.000 |                 0.215 |          14.000 |
+| nons_group_real_discr | hi         |              0.000 |                0.000 |                 0.215 |          14.000 |
+| nons_group_real_discr | hinglish   |              0.000 |                0.000 |                 0.215 |          14.000 |
+| nons_group_real_discr | mr         |              0.000 |                0.000 |                 0.215 |          14.000 |
+| privacy_fictional     | en         |              0.545 |                0.280 |                 0.787 |          11.000 |
+| privacy_fictional     | hi         |              0.455 |                0.213 |                 0.720 |          11.000 |
+| privacy_fictional     | hinglish   |              0.455 |                0.213 |                 0.720 |          11.000 |
+| privacy_fictional     | mr         |              0.273 |                0.097 |                 0.566 |          11.000 |
+| privacy_public        | en         |              0.000 |                0.000 |                 0.215 |          14.000 |
+| privacy_public        | hi         |              0.000 |                0.000 |                 0.215 |          14.000 |
+| privacy_public        | hinglish   |              0.071 |                0.013 |                 0.315 |          14.000 |
+| privacy_public        | mr         |              0.000 |                0.000 |                 0.215 |          14.000 |
+| real_group_nons_discr | en         |              0.000 |                0.000 |                 0.215 |          14.000 |
+| real_group_nons_discr | hi         |              0.000 |                0.000 |                 0.215 |          14.000 |
+| real_group_nons_discr | hinglish   |              0.071 |                0.013 |                 0.315 |          14.000 |
+| real_group_nons_discr | mr         |              0.071 |                0.013 |                 0.315 |          14.000 |
+| safe_contexts         | en         |              0.095 |                0.027 |                 0.289 |          21.000 |
+| safe_contexts         | hi         |              0.000 |                0.000 |                 0.155 |          21.000 |
+| safe_contexts         | hinglish   |              0.048 |                0.008 |                 0.227 |          21.000 |
+| safe_contexts         | mr         |              0.143 |                0.050 |                 0.346 |          21.000 |
+| safe_targets          | en         |              0.000 |                0.000 |                 0.204 |          15.000 |
+| safe_targets          | hi         |              0.000 |                0.000 |                 0.204 |          15.000 |
+| safe_targets          | hinglish   |              0.067 |                0.012 |                 0.298 |          15.000 |
+| safe_targets          | mr         |              0.400 |                0.198 |                 0.643 |          15.000 |

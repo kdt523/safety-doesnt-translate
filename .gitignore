@@ -5,3 +5,7 @@ data/*
 results/*
 !results/.gitkeep
 kaggle/out*/
+!results/*summary*
+!results/*by_risk_area*
+!results/*by_safe_type*
+!results/translation_quality.md
