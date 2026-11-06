@@ -1,0 +1,7 @@
+{
+  "model": "CohereLabs/tiny-aya-fire",
+  "layer": 18,
+  "split": "direction",
+  "n_harmful_en": 43,
+  "n_harmless_en": 47
+}

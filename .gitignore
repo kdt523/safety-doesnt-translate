@@ -9,3 +9,5 @@ kaggle/out*/
 !results/*by_risk_area*
 !results/*by_safe_type*
 !results/translation_quality.md
+!results/phase3_*
+results/phase3_directions.pt
