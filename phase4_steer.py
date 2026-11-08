@@ -20,6 +20,7 @@ Stages:
 Tuning never touches the test split; the reported numbers come from judging the
 test generations with the same WildGuard judge used for the Phase 2 baseline.
 """
+import contextlib
 import json
 import re
 import sys
@@ -96,6 +97,24 @@ def fit_condition(model, tok, df, layer):
     return cond
 
 
+@contextlib.contextmanager
+def always_on(model, layer, vec, alpha):
+    """Unconditional steering, matching CASTModel's hook (h + alpha * vec)."""
+    from safetune._refusal_helpers import _get_decoder_layers
+
+    def hook(_m, _i, out):
+        is_tuple = isinstance(out, tuple)
+        h = out[0] if is_tuple else out
+        h = h + alpha * vec.to(dtype=h.dtype, device=h.device)
+        return (h,) + out[1:] if is_tuple else h
+
+    handle = _get_decoder_layers(model)[layer].register_forward_hook(hook)
+    try:
+        yield
+    finally:
+        handle.remove()
+
+
 def run_variant(model, tok, prompts, direction, layer, alpha, condition=None,
                 max_new_tokens=MAX_NEW_TOKENS):
     """Generate with steering applied, either always-on or behind the CAST gate.
@@ -106,11 +125,13 @@ def run_variant(model, tok, prompts, direction, layer, alpha, condition=None,
     """
     from safetune.interventions.steer import CASTModel
 
-    vectors = {layer: direction.to(model.device, dtype=torch.float32)}
-    steered = CASTModel(model, vectors, condition=condition, alpha=alpha)
+    vec = direction.to(model.device, dtype=torch.float32)
     if condition is None:
-        with steered:
+        # CASTModel refuses to build without a condition, so always-on uses a
+        # plain hook that adds the same alpha * vector at the same layer.
+        with always_on(model, layer, vec, alpha):
             return generate_batched(model.generate, model, tok, prompts, max_new_tokens)
+    steered = CASTModel(model, {layer: vec}, condition=condition, alpha=alpha)
     return generate_batched(steered.generate, model, tok, prompts, max_new_tokens)
 
 
