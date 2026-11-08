@@ -12,3 +12,6 @@ kaggle/out*/
 !results/phase3_*
 !results/*.pt
 !results/phase4_*
+
+# Office lock files
+~$*
