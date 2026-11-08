@@ -1,0 +1,8 @@
+{
+  "variant": "cast",
+  "alpha": 8.0,
+  "layer": 18,
+  "condition_layer": 17,
+  "condition_threshold": 0.22000000000000108,
+  "condition_comparator": "smaller"
+}

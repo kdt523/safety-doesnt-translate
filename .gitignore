@@ -11,3 +11,4 @@ kaggle/out*/
 !results/translation_quality.md
 !results/phase3_*
 !results/*.pt
+!results/phase4_*
