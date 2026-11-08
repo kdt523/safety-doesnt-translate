@@ -8,8 +8,9 @@ already has, not to build a new one.
 
 Variants (all add alpha * refusal_direction at the steering layer):
 
-  cast        SafeTune's CASTModel: a cosine gate decides per prompt, and only
-              prompts that trip it are steered, with one fixed alpha.
+  cast        CAST with SafeTune's fitted cosine gate: the gate decides per
+              prompt, and only prompts that trip it are steered, with one
+              fixed alpha.
   matched     the gate decides as above, then each steered prompt gets its own
               alpha = target - (its projection on the direction), capped, where
               target is the mean projection of harmful English prompts. This
@@ -120,7 +121,9 @@ def last_token_states(model, batch, layers):
     handles = [_decoder_layers(model)[l].register_forward_hook(make(l)) for l in layers]
     try:
         with torch.no_grad():
-            model(**batch)
+            # Only the hooked activations are needed; logits_to_keep=1 avoids
+            # building (batch x seq x vocab) logits.
+            model(**batch, logits_to_keep=1)
     finally:
         for h in handles:
             h.remove()
@@ -171,31 +174,33 @@ def label(setting):
 def steer_generate(model, tok, prompts, setting, ctx, max_new_tokens=MAX_NEW_TOKENS,
                    **gen_kwargs):
     """Generate under one setting: unsteered, cast, always, matched, matched_nogate."""
-    from safetune.interventions.steer import CASTModel
-
     v = setting["variant"]
     vec = ctx["direction"].to(model.device, dtype=torch.float32)
     layer = ctx["layer"]
     if v == "unsteered":
         return generate_batched(model.generate, model, tok, prompts, max_new_tokens, **gen_kwargs)
-    if v == "cast":
-        steered = CASTModel(model, {layer: vec}, condition=ctx["condition"],
-                            alpha=setting["alpha"], per_prompt_gate=True)
-        return generate_batched(steered.generate, model, tok, prompts, max_new_tokens,
-                                **gen_kwargs)
     if v == "always":
         with add_direction(model, layer, vec, setting["alpha"]):
             return generate_batched(model.generate, model, tok, prompts, max_new_tokens,
                                     **gen_kwargs)
-    if v in ("matched", "matched_nogate"):
+    if v in ("cast", "matched", "matched_nogate"):
+        # Gated loop. The gate is SafeTune's own test (_cast_similarity and
+        # _condition_met at the fitted layer and threshold), so "cast" is CAST as
+        # CASTModel runs it; checked row for row against CASTModel on a small
+        # model. CASTModel itself is not used because its gate pass computes
+        # logits at every position over a 262k vocabulary, which does not fit a
+        # T4 at batch 16.
         gen_kwargs = {"do_sample": False, **gen_kwargs}
         outs = []
         for i in range(0, len(prompts), BATCH_SIZE):
             batch = encode(tok, prompts[i:i + BATCH_SIZE], model.device)
             fires, proj = gate_and_projection(model, batch, ctx)
-            alphas = (ctx["target"] - proj).clamp(0.0, MATCHED_ALPHA_MAX)
-            if v == "matched":
-                alphas = alphas * fires
+            if v == "cast":
+                alphas = setting["alpha"] * fires
+            else:
+                alphas = (ctx["target"] - proj).clamp(0.0, MATCHED_ALPHA_MAX)
+                if v == "matched":
+                    alphas = alphas * fires
             with add_direction(model, layer, vec, alphas), torch.no_grad():
                 gen = model.generate(**batch, max_new_tokens=max_new_tokens, **gen_kwargs)
             outs += tok.batch_decode(gen[:, batch["input_ids"].shape[1]:],
