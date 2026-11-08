@@ -1,7 +1,7 @@
 """Phase 5: does the fix hold up under repeated attempts? (Track 2a #1)
 
 Two robustness checks, each run on the unsteered model and on the steered one
-(conditional steering at the Phase 4 setting):
+(the setting Phase 4 chose on the val split):
 
   library probes   AuditKIT's own RedTeamRunner with its built-in probes
                    (prompt injection, jailbreak, encoding, refusal). They are
@@ -40,23 +40,16 @@ MAX_NEW_TOKENS = 128          # compliance shows up early; full length is not ne
 PROBE_MAX_NEW_TOKENS = 200
 
 
-def steered_setup(model):
-    """Direction + CAST condition saved by Phases 3 and 4."""
-    from safetune.interventions.steer import CASTCondition
-
+def steered_setup():
+    """The setting chosen on val in Phase 4, plus the saved gate and direction."""
     import phase4_steer as p4
 
-    direction, layer = p4.load_direction()
-    choice = json.load(open("results/phase4_choice.json"))
-    saved = torch.load("results/phase4_condition.pt", weights_only=False)
-    condition = CASTCondition(
-        condition_vector=saved["condition_vector"], condition_layer=saved["condition_layer"],
-        threshold=saved["threshold"], comparator=saved["comparator"], f1=0.0,
-        pool=saved["pool"])
-    return direction, layer, float(choice["alpha"]), condition
+    choice = json.load(open(p4.CHOICE_FILE))
+    setting = {k: choice[k] for k in ("variant", "alpha") if k in choice}
+    return setting, p4.load_ctx()
 
 
-def library_probes(model, tok, direction, layer, alpha, condition):
+def library_probes(model, tok, setting, ctx):
     """AuditKIT's RedTeamRunner against both models, via callables."""
     from auditkit.redteam import RedTeamRunner
 
@@ -66,8 +59,8 @@ def library_probes(model, tok, direction, layer, alpha, condition):
         return p4.generate_batched(model.generate, model, tok, prompts, PROBE_MAX_NEW_TOKENS)
 
     def steered(prompts):
-        return p4.run_variant(model, tok, prompts, direction, layer, alpha, condition,
-                              max_new_tokens=PROBE_MAX_NEW_TOKENS)
+        return p4.steer_generate(model, tok, prompts, setting, ctx,
+                                 max_new_tokens=PROBE_MAX_NEW_TOKENS)
 
     rows = []
     for name, fn in (("unsteered", base), ("steered", steered)):
@@ -83,7 +76,7 @@ def library_probes(model, tok, direction, layer, alpha, condition):
     print(summary.to_string(index=False))
 
 
-def best_of_n(model, tok, direction, layer, alpha, condition):
+def best_of_n(model, tok, setting, ctx):
     import phase4_steer as p4
 
     df = load_dataset(DATASET_CLEAN, split="train").to_pandas()
@@ -99,13 +92,9 @@ def best_of_n(model, tok, direction, layer, alpha, condition):
     for variant in ("unsteered", "steered"):
         for k in range(N_SAMPLES):
             sample_args = dict(do_sample=True, temperature=TEMPERATURE, top_p=TOP_P)
-            if variant == "unsteered":
-                answers = p4.generate_batched(model.generate, model, tok, prompts,
-                                              MAX_NEW_TOKENS, **sample_args)
-            else:
-                answers = p4.run_variant(model, tok, prompts, direction, layer, alpha,
-                                         condition, max_new_tokens=MAX_NEW_TOKENS,
-                                         **sample_args)
+            run = {"variant": "unsteered"} if variant == "unsteered" else setting
+            answers = p4.steer_generate(model, tok, prompts, run, ctx,
+                                        max_new_tokens=MAX_NEW_TOKENS, **sample_args)
             rows.append(df.assign(attack=f"bestofn_{variant}", sample=k, answer=answers,
                                   model=MODEL_ID.split("/")[-1]))
             print(f"  {variant} sample {k + 1}/{N_SAMPLES}", flush=True)
@@ -114,10 +103,10 @@ def best_of_n(model, tok, direction, layer, alpha, condition):
 
 def generate():
     model, tok = load_model(MODEL_ID)
-    direction, layer, alpha, condition = steered_setup(model)
+    setting, ctx = steered_setup()
 
-    library_probes(model, tok, direction, layer, alpha, condition)
-    logs = best_of_n(model, tok, direction, layer, alpha, condition)
+    library_probes(model, tok, setting, ctx)
+    logs = best_of_n(model, tok, setting, ctx)
     del model
     torch.cuda.empty_cache()
 
