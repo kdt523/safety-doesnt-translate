@@ -1,4 +1,4 @@
-﻿*.zip
+*.zip
 __pycache__/
 data/*
 !data/.gitkeep
@@ -12,6 +12,7 @@ kaggle/out*/
 !results/phase3_*
 !results/*.pt
 !results/phase4_*
+!results/archive_rightpad/
 
 # Office lock files
 ~$*

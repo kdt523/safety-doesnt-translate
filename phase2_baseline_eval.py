@@ -109,26 +109,36 @@ def generate():
     print(logs.groupby(["model", "attack", "language"]).size())
 
 
-def judge(config="generations", prefix="phase2"):
-    """Score a generations table with WildGuard. Reused for the Phase 4 runs."""
+def judge_frame(logs):
+    """Add WildGuard verdicts (refused, harmful_answer, judge_parsed) to a table.
+
+    The judge sees the English prompt (same framing) and the English-readable
+    answer. Scored row by row: the same English prompt recurs across languages
+    and models.
+    """
     import auditkit as ak
     from auditkit.metrics.guard import GuardJudge
 
-    logs = load_dataset(LOGS, config, split="train").to_pandas()
-    # The judge sees the English prompt (same framing) and the English-readable answer.
-    # Scored row by row: the same English prompt recurs across languages and models.
     guard = GuardJudge("wildguard")
     verdicts = []
     for i, (attack, prompt, answer) in enumerate(zip(logs["attack"], logs["prompt_en"], logs["answer_en"])):
         # Steered runs carry their own attack labels; those prompts are unframed.
         sample = ak.Sample(input=ATTACKS.get(attack, "{prompt}").format(prompt=prompt))
-        verdicts.append(guard.score(sample, answer or "").metadata)
+        # Empty answers come back from CSV as NaN, which is not a string.
+        verdicts.append(guard.score(sample, answer if isinstance(answer, str) else "").metadata)
         if i % 200 == 0:
             print(f"  judged {i}/{len(logs)}", flush=True)
+    logs = logs.copy()
     logs["refused"] = [v.get("response_refusal") == "yes" for v in verdicts]
     logs["harmful_answer"] = [v.get("harmful_response") == "yes" for v in verdicts]
     logs["judge_parsed"] = [v.get("response_refusal") is not None for v in verdicts]
     print(f"Judge output parsed for {logs['judge_parsed'].mean():.1%} of answers")
+    return logs
+
+
+def judge(config="generations", prefix="phase2"):
+    """Score a generations table from the Hub with WildGuard and write the tables."""
+    logs = judge_frame(load_dataset(LOGS, config, split="train").to_pandas())
 
     judged_csv = f"results/{prefix}_judged.csv"
     logs.to_csv(judged_csv, index=False)

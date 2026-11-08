@@ -18,7 +18,10 @@ def load_model(model_id=MODEL_ID):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    tok = AutoTokenizer.from_pretrained(model_id)
+    # Left padding is required for batched generation: with right padding, every
+    # shorter prompt in a batch has pad tokens between its prompt and its answer,
+    # and the model writes broken text. (This corrupted the first Phase 4 run.)
+    tok = AutoTokenizer.from_pretrained(model_id, padding_side="left")
     model = AutoModelForCausalLM.from_pretrained(
         model_id, torch_dtype=torch.float16, device_map="auto"
     )
