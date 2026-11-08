@@ -67,15 +67,20 @@ def load_direction():
     return store["en"], int(store["_layer"])
 
 
-def generate_batched(generate_fn, model, tok, prompts, max_new_tokens, batch_size=16):
-    """`generate_fn` is model.generate, or CASTModel.generate for the gated run."""
+def generate_batched(generate_fn, model, tok, prompts, max_new_tokens, batch_size=16,
+                     **gen_kwargs):
+    """`generate_fn` is model.generate, or CASTModel.generate for the gated run.
+
+    Greedy unless `gen_kwargs` say otherwise (e.g. do_sample=True for best-of-N).
+    """
+    gen_kwargs = {"do_sample": False, **gen_kwargs}
     outs = []
     for i in range(0, len(prompts), batch_size):
         chats = [[{"role": "user", "content": p}] for p in prompts[i:i + batch_size]]
         batch = tok.apply_chat_template(chats, add_generation_prompt=True, padding=True,
                                         return_dict=True, return_tensors="pt").to(model.device)
         with torch.no_grad():
-            gen = generate_fn(**batch, max_new_tokens=max_new_tokens, do_sample=False)
+            gen = generate_fn(**batch, max_new_tokens=max_new_tokens, **gen_kwargs)
         outs += tok.batch_decode(gen[:, batch["input_ids"].shape[1]:], skip_special_tokens=True)
     return outs
 
@@ -116,7 +121,7 @@ def always_on(model, layer, vec, alpha):
 
 
 def run_variant(model, tok, prompts, direction, layer, alpha, condition=None,
-                max_new_tokens=MAX_NEW_TOKENS):
+                max_new_tokens=MAX_NEW_TOKENS, **gen_kwargs):
     """Generate with steering applied, either always-on or behind the CAST gate.
 
     CASTModel's context manager installs *unconditional* hooks, so the gate only
@@ -130,9 +135,11 @@ def run_variant(model, tok, prompts, direction, layer, alpha, condition=None,
         # CASTModel refuses to build without a condition, so always-on uses a
         # plain hook that adds the same alpha * vector at the same layer.
         with always_on(model, layer, vec, alpha):
-            return generate_batched(model.generate, model, tok, prompts, max_new_tokens)
+            return generate_batched(model.generate, model, tok, prompts, max_new_tokens,
+                                    **gen_kwargs)
     steered = CASTModel(model, {layer: vec}, condition=condition, alpha=alpha)
-    return generate_batched(steered.generate, model, tok, prompts, max_new_tokens)
+    return generate_batched(steered.generate, model, tok, prompts, max_new_tokens,
+                            **gen_kwargs)
 
 
 def tune():

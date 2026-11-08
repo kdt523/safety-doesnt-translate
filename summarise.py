@@ -78,12 +78,15 @@ def main(judged_csv, out_prefix):
     # harmless prompts carry labels from different sources, so they get separate
     # tables (HarmBench risk areas vs XSTest over-refusal types).
     fire = logs[logs["model"].str.contains("fire") & (logs["attack"] == "plain")]
-    write(summarise(fire[fire["harmful"]], ["category", "language"]),
-          f"{out_prefix}_by_risk_area",
-          "Tiny Aya Fire, plain prompts: harmful risk area x language")
-    write(summarise(fire[~fire["harmful"]], ["category", "language"]),
-          f"{out_prefix}_by_safe_type",
-          "Tiny Aya Fire, plain prompts: over-refusal by prompt type x language")
+    # Only the baseline run has plain prompts; steered and best-of-N runs skip this.
+    for part, name, title in (
+        (fire[fire["harmful"]], "by_risk_area",
+         "Tiny Aya Fire, plain prompts: harmful risk area x language"),
+        (fire[~fire["harmful"]], "by_safe_type",
+         "Tiny Aya Fire, plain prompts: over-refusal by prompt type x language"),
+    ):
+        if len(part):
+            write(summarise(part, ["category", "language"]), f"{out_prefix}_{name}", title)
 
 
 if __name__ == "__main__":
