@@ -9,8 +9,7 @@ import shutil
 import subprocess
 import sys
 
-PHASE = ("phase4_steer.py tune_generate && python phase4_steer.py tune_judge"
-         " && python phase4_steer.py test_generate && python phase4_steer.py test_judge")
+PHASE = "phase4_steer.py test_judge"
 REPO = "https://github.com/kdt523/safety-doesnt-translate.git"
 WORK = "/kaggle/working"
 PROJECT = "/tmp/project"
@@ -52,6 +51,7 @@ except Exception as e:
     sys.exit(1)
 
 os.environ.setdefault("HF_USER", "kd1609")
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 os.makedirs("results", exist_ok=True)
 code = sh(f"python {PHASE}")
 
