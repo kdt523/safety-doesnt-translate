@@ -1,0 +1,9 @@
+{
+  "layer": 18,
+  "target": 24.9365234375,
+  "condition_layer": 17,
+  "condition_threshold": 0.2600000000000011,
+  "condition_comparator": "smaller",
+  "condition_f1": 0.9822485207100593,
+  "fitted_on": "direction"
+}

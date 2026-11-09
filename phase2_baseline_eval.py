@@ -128,6 +128,10 @@ def judge_frame(logs):
         verdicts.append(guard.score(sample, answer if isinstance(answer, str) else "").metadata)
         if i % 200 == 0:
             print(f"  judged {i}/{len(logs)}", flush=True)
+        if i % 50 == 0:
+            # Long runs fragment GPU memory; a 2,152-answer run ran out at ~800.
+            import torch
+            torch.cuda.empty_cache()
     logs = logs.copy()
     logs["refused"] = [v.get("response_refusal") == "yes" for v in verdicts]
     logs["harmful_answer"] = [v.get("harmful_response") == "yes" for v in verdicts]
