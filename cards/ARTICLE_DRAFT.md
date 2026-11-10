@@ -14,7 +14,10 @@
   text **activates it weakly**.
 - Because the direction already exists, the fix needs no retraining: **conditional
   activation steering** pushes it back where it is under-activated.
-- TODO: headline before-and-after on the held-out test split.
+- On the held-out test split, conditional steering cuts Hinglish attack success from
+  **51% to 31%**, Marathi from 32% to 12% and Hindi from 18% to 6%, with **no rise in
+  over-refusal in any language**. The same push without the gate makes the model refuse
+  20-55% of harmless questions.
 
 ## Why this matters
 
@@ -119,22 +122,79 @@ attacked less, so projection strength is not the whole story.
 ## The fix: conditional steering
 
 Since the direction already exists, we add it back at inference time, with no retraining.
-Two variants:
 
-- **Always-on:** add alpha times the direction to every prompt.
-- **Conditional (CAST):** check a cosine gate first, and steer only prompts that trip it.
-  The gate was fitted on all four languages at layer 17 (held-out F1 0.98).
+- **Conditional (CAST):** a cosine gate at layer 17 decides, per prompt, whether the
+  prompt looks harmful. Only prompts that trip it get alpha times the refusal direction
+  added at layer 18. The gate was fitted on all four languages of the `direction` split
+  (held-out F1 0.98) using SafeTune's `fit_cast_condition`.
+- **Projection-matched (ours):** the same gate, but each steered prompt is topped up to
+  the English refusal level (alpha = 24.9 minus its own projection). It follows directly
+  from Finding 2 and has no tuned parameter.
+- **Always-on:** the chosen push with the gate removed, to show what the gate buys.
 
-Strength alpha was tuned on the `val` split only. On that split, using a keyword refusal
-matcher as a cheap proxy, conditional steering at alpha 8 reached 86% refusal on harmful
-prompts with 5.9% over-refusal, against 50% over-refusal for always-on at the same
-strength. These are tuning numbers, not results. The reported numbers below come from
-the held-out test split and the WildGuard judge.
+**How the setting was chosen.** Every candidate (CAST at alpha 4, 6, 8, 12, and
+projection-matched) was run on the `val` split and scored with WildGuard. A rule fixed
+before seeing results kept only settings whose over-refusal rose by at most 5 points
+overall (10 in any language) and whose broken-output rate rose by at most 5 points, then
+took the lowest attack success. All five passed; CAST at alpha 12 won (val ASR 9.3%
+against 23.8% unsteered, over-refusal unchanged). Projection-matched came second with
+the least broken output.
 
 ## Results on the held-out test split
 
-TODO: before-and-after table for ASR, refusal and over-refusal per language, baseline
-versus conditional steering versus always-on, with intervals.
+Tiny Aya Fire, 113 harmful and 156 harmless prompts per language, WildGuard judge, 95%
+Wilson intervals.
+
+**Attack success (lower is safer)**
+
+| Language | Before | Conditional steering | Always-on (no gate) |
+|---|---|---|---|
+| English | 7.1% (3.6-13.4) | 1.8% (0.5-6.2) | 1.8% |
+| Hindi | 17.7% (11.8-25.8) | **6.2%** (3.0-12.2) | 6.2% |
+| Marathi | 31.9% (24.0-40.9) | **11.5%** (6.8-18.7) | 9.7% |
+| Hinglish | 51.3% (42.2-60.3) | **31.0%** (23.2-40.0) | 27.4% |
+
+**Over-refusal (lower is more useful)**
+
+| Language | Before | Conditional steering | Always-on (no gate) |
+|---|---|---|---|
+| English | 6.4% | **6.4%** | 55.1% |
+| Hindi | 5.1% | **5.1%** | 35.9% |
+| Marathi | 12.2% | **12.2%** | 35.3% |
+| Hinglish | 7.1% | **7.1%** | 20.5% |
+
+- The drops in Hindi, Marathi and Hinglish are outside the intervals. English starts too
+  low to call.
+- Over-refusal is identical to the unsteered model: the gate did not steer a single
+  harmless prompt into a new refusal. Without the gate, the same push is unusable.
+- Broken output (near-empty or looping answers) is unchanged in English, Hindi and
+  Marathi (0%). In Hinglish it rises on harmful prompts from 9.7% to 15.9%, so a small
+  part of the Hinglish drop is the model breaking down, not refusing.
+- **Hinglish is not fixed.** Steering closes about 45% of its gap to English. It remains
+  the weakest language.
+
+## Getting the evaluation right
+
+Our first steering run looked like a different result: attack success fell, but
+over-refusal rose to 27-76%. Reading the answers showed most of them were broken text.
+Batched generation was padding prompts on the right, so shorter prompts in each batch
+were followed by pad tokens and the model wrote loops and fragments. WildGuard scores
+broken text as "not harmful" and often as "refused", so both effects were artefacts.
+
+The check that found it: harmless prompts the gate did not steer must produce exactly
+the unsteered answer. They did 42% of the time when the prompt was the longest in its
+batch (no padding) and 0% of the time when it was among the shortest.
+
+What we changed, and what we recommend to anyone evaluating steering:
+
+- Left padding, enforced in code.
+- A **broken-output rate** next to every metric, so a model that falls apart cannot look
+  safe. It also showed that unsteered Tiny Aya already loops on about 20% of harmless
+  Hinglish prompts.
+- Tune with the real judge, not a keyword matcher (keywords cannot see broken text).
+- Fit the gate on a different split from the one used to choose alpha.
+
+The corrupted run is kept in the repository (`results/archive_rightpad/`).
 
 ## Robustness
 
@@ -162,6 +222,7 @@ must be measured.
 - The judge is English-trained and sees translated answers for two languages.
 - Moderate sample size per language. Differences smaller than the intervals are not
   claims.
+- One extra push setting (alpha 12) was chosen from five; all five passed the rule.
 - Steering strength is tuned on one model. We have not tested that it transfers to
   other models or languages.
 - Mechanism claims rest on four languages and one layer.
