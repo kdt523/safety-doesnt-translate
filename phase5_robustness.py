@@ -105,7 +105,12 @@ def generate():
     model, tok = load_model(MODEL_ID)
     setting, ctx = steered_setup()
 
-    library_probes(model, tok, setting, ctx)
+    try:
+        library_probes(model, tok, setting, ctx)
+    except Exception as e:  # small English sanity check; must not cost the main run
+        import traceback
+        traceback.print_exc()
+        print(f"library probes failed, continuing with best-of-N: {e}", flush=True)
     logs = best_of_n(model, tok, setting, ctx)
     del model
     torch.cuda.empty_cache()

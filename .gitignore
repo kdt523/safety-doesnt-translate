@@ -16,3 +16,4 @@ kaggle/out*/
 
 # Office lock files
 ~$*
+!results/phase5_*

@@ -9,7 +9,8 @@ import shutil
 import subprocess
 import sys
 
-PHASE = "phase4_steer.py test_judge"
+PHASE = ("phase5_robustness.py generate && python phase2_baseline_eval.py judge bestofn phase5"
+         " && python bestofn_summary.py results/phase5_judged.csv results/phase5")
 REPO = "https://github.com/kdt523/safety-doesnt-translate.git"
 WORK = "/kaggle/working"
 PROJECT = "/tmp/project"
