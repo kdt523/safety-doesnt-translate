@@ -17,3 +17,6 @@ kaggle/out*/
 # Office lock files
 ~$*
 !results/phase5_*
+
+# Kaggle API keys
+kaggle.json
