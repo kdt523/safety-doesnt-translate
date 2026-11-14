@@ -38,7 +38,13 @@ from huggingface_hub import login
 
 # Secrets are not available to runs started from the CLI, so the token comes
 # from a private dataset (krushnadatir523/hf-token); the secret is a fallback for UI runs.
-TOKEN_FILE = "/kaggle/input/hf-token/hf_token.txt"
+import glob
+
+# The mount path differs between accounts (/kaggle/input/hf-token or
+# /kaggle/input/datasets/<user>/hf-token), so search for the file.
+TOKEN_FILE = next(iter(sorted(glob.glob("/kaggle/input/**/hf_token.txt", recursive=True))),
+                  "/kaggle/input/hf-token/hf_token.txt")
+print("token file:", TOKEN_FILE, os.path.exists(TOKEN_FILE))
 try:
     if os.path.exists(TOKEN_FILE):
         token = open(TOKEN_FILE).read().strip()
