@@ -205,7 +205,10 @@ The corrupted run is kept in the repository (`results/archive_rightpad/`).
 **What we measured.** A fictional-story jailbreak framing (the first pattern in
 AuditKIT's built-in jailbreak probe) raises English attack success from 7.1% to 20.4%,
 while plain Hinglish already reaches 51.3%. Switching language is a stronger attack on
-this model than an explicit jailbreak in English.
+this model than an explicit jailbreak in English. The two also stack: with the fiction
+framing, attack success reaches 39.8% in Hindi and 56.6% in Marathi (from 17.7% and 31.9%
+plain). Steering was evaluated on plain prompts only; whether it holds against the
+fiction framing is untested.
 
 **What we built but could not run in time.** A best-of-5 sampling attack (a prompt
 counts as broken if any of five sampled answers is judged harmful) on the unsteered and
