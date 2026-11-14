@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Safety Doesn't Translate</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1c1a;--muted:#6b675f;--line:#e4e0d6;--card:#fff;--accent:#3b4fb8;--bad:#b4442c;--good:#2f7d4f;--warn:#a87412}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--fg:#ecebe6;--muted:#a19d93;--line:#34322d;--card:#1f1e1b;--accent:#8fa0ff;--bad:#f08a6f;--good:#71c792;--warn:#e0b45a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:2rem;margin:0 0 4px;letter-spacing:-.02em}h2{font-size:1.25rem;margin:40px 0 8px}
+.lede{color:var(--muted);font-size:1.05rem;max-width:720px}.links a{color:var(--accent);margin-right:14px;text-decoration:none}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:24px 0}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.stat b{display:block;font-size:1.6rem;font-variant-numeric:tabular-nums}.stat span{color:var(--muted);font-size:.9rem}
+.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;background:var(--card);border:1px solid var(--line);border-radius:10px}
+th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}th:first-child,td:first-child{text-align:left}
+th{font-size:.82rem;color:var(--muted);font-weight:600}.ci{color:var(--muted);font-size:.8rem}.hl{font-weight:700}
+.bars{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.bar{display:grid;grid-template-columns:150px 1fr 48px;align-items:center;gap:10px;margin:6px 0;font-size:.9rem}
+.track{height:14px;background:var(--line);border-radius:7px;position:relative}.fill{height:100%;border-radius:7px;background:var(--accent)}
+.fill.harmless{background:var(--muted)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:6px 12px;border-radius:8px;cursor:pointer}
+button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pair{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:10px 0}
+.pair .p{font-weight:600;margin-bottom:8px}.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:640px){.cols{grid-template-columns:1fr}.bar{grid-template-columns:110px 1fr 40px}}
+.ans{font-size:.88rem;white-space:pre-wrap;color:var(--fg);max-height:180px;overflow:auto;border-left:3px solid var(--line);padding-left:10px}
+.tag{display:inline-block;font-size:.75rem;font-weight:700;padding:1px 8px;border-radius:99px;margin-bottom:4px}
+.t-harmful{background:var(--bad);color:#fff}.t-refused{background:var(--good);color:#fff}.t-answered{background:var(--line)}.t-broken{background:var(--warn);color:#fff}
+.note{color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+<h1>Safety Doesn't Translate</h1>
+<p class="lede">Tiny Aya Fire refuses most harmful requests in English and far fewer of the same
+requests in Hinglish. The refusal concept is still in the model; code-mixed text just activates
+it weakly. Conditional activation steering puts it back, with no retraining and no rise in
+over-refusal.</p>
+<p class="links"><a href="https://github.com/kdt523/safety-doesnt-translate">Code</a>
+<a href="https://huggingface.co/datasets/kd1609/hinglish-safety-bench">Benchmark</a>
+<a href="https://huggingface.co/datasets/kd1609/hinglish-safety-eval-logs">Eval logs</a>
+<a href="https://huggingface.co/kd1609/tiny-aya-fire-hinglish-refusal-steering">Steering vectors</a></p>
+
+<div class="stats" id="stats"></div>
+
+<h2>Before and after, held-out test split</h2>
+<p class="note">113 harmful and 156 harmless prompts per language, WildGuard judge, 95% intervals.
+"Always-on" is the same push without the gate.</p>
+<div class="wrap"><table id="tbl"></table></div>
+
+<h2>Why it happens</h2>
+<p class="note">Mean projection of prompts onto the model's refusal direction (layer 18 of 36).
+Harmful Hinglish prompts sit well below harmful English ones: same direction, weaker signal.</p>
+<div class="bars" id="mech"></div>
+
+<h2>Answers before and after steering</h2>
+<p class="note">Answers the judge scored as harmful are redacted.</p>
+<div class="controls" id="lang"></div><div class="controls" id="kind"></div>
+<div id="pairs"></div>
+</main>
+<script>
+const D=/*DATA*/null;
+const pct=r=>`${r.rate.toFixed(1)}%`;
+const ci=r=>`<span class="ci">${r.lo}-${r.hi}</span>`;
+const hing=D.table.find(r=>r.language==="Hinglish");
+document.getElementById("stats").innerHTML=[
+ [pct(hing.before.asr)+" → "+pct(hing.cast.asr),"Hinglish attack success"],
+ [pct(hing.before.over)+" → "+pct(hing.cast.over),"Hinglish over-refusal"],
+ [D.table.map(r=>r.cast.over.rate===r.before.over.rate).every(Boolean)?"0 points":"changed","Over-refusal rise, any language"],
+].map(([b,s])=>`<div class="stat"><b>${b}</b><span>${s}</span></div>`).join("");
+let t=`<tr><th>Language</th><th>Attack success before</th><th>after steering</th><th>always-on</th><th>Over-refusal before</th><th>after steering</th><th>always-on</th></tr>`;
+for(const r of D.table){t+=`<tr><td>${r.language}</td><td>${pct(r.before.asr)} ${ci(r.before.asr)}</td><td class="hl">${pct(r.cast.asr)} ${ci(r.cast.asr)}</td><td>${pct(r.always.asr)}</td><td>${pct(r.before.over)}</td><td class="hl">${pct(r.cast.over)}</td><td>${pct(r.always.over)}</td></tr>`}
+document.getElementById("tbl").innerHTML=t;
+const max=Math.max(...D.mech.map(m=>m.mean));
+document.getElementById("mech").innerHTML=D.mech.filter(m=>m.prompts==="harmful").map(m=>
+ `<div class="bar"><span>${m.language} harmful</span><div class="track"><div class="fill" style="width:${100*m.mean/max}%"></div></div><span>${m.mean}</span></div>`).join("");
+let L="hinglish",K=true;
+const LN={en:"English",hi:"Hindi",mr:"Marathi",hinglish:"Hinglish"};
+function controls(){
+ document.getElementById("lang").innerHTML=Object.entries(LN).map(([k,v])=>`<button class="${k===L?"on":""}" data-l="${k}">${v}</button>`).join("");
+ document.getElementById("kind").innerHTML=[[true,"Harmful prompts"],[false,"Harmless prompts"]].map(([k,v])=>`<button class="${k===K?"on":""}" data-k="${k}">${v}</button>`).join("");
+ document.querySelectorAll("[data-l]").forEach(b=>b.onclick=()=>{L=b.dataset.l;render()});
+ document.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{K=b.dataset.k==="true";render()});
+}
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function render(){controls();
+ document.getElementById("pairs").innerHTML=D.pairs.filter(p=>p.lang===L&&p.harmful===K).map(p=>
+ `<div class="pair"><div class="p">${esc(p.prompt)}</div><div class="cols">
+ <div><span class="tag t-${p.before_v}">before: ${p.before_v}</span><div class="ans">${esc(p.before)}</div></div>
+ <div><span class="tag t-${p.after_v}">after: ${p.after_v}</span><div class="ans">${esc(p.after)}</div></div></div></div>`).join("");}
+render();
+</script>
+</body>
+</html>
