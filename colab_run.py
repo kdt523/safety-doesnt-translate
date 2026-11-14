@@ -12,13 +12,13 @@ import sys
 
 RESULTS_REPO = f"{os.environ.get('HF_USER', 'kd1609')}/lexsi-run-results"
 
-STEPS = [
-    "python phase6_multiturn.py generate",
-    "python phase6_multiturn.py judge",
-    "python phase5_robustness.py generate",
-    "python phase2_baseline_eval.py judge bestofn phase5",
-    "python bestofn_summary.py results/phase5_judged.csv results/phase5",
-]
+PHASE6 = ["python phase6_multiturn.py generate",
+          "python phase6_multiturn.py judge"]
+PHASE5 = ["python phase5_robustness.py generate",
+          "python phase2_baseline_eval.py judge bestofn phase5",
+          "python bestofn_summary.py results/phase5_judged.csv results/phase5"]
+# `python colab_run.py 6` or `5` runs one phase (two jobs in parallel); no argument runs both.
+STEPS = {"6": PHASE6, "5": PHASE5}.get(sys.argv[1] if len(sys.argv) > 1 else "", PHASE6 + PHASE5)
 
 
 def upload(note):
