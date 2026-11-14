@@ -216,13 +216,14 @@ def judge():
     esc = p2.judge_frame(esc.assign(attack="multiturn"))
     esc.to_csv("results/phase6_escalation_judged.csv", index=False)
 
-    # Single-turn rates on the same prompts, for comparison.
-    single = {"unsteered": pd.read_csv("results/phase2_judged.csv"),
-              "steered": pd.read_csv("results/phase4_judged.csv")}
-    single["unsteered"] = single["unsteered"][
-        (single["unsteered"]["model"] == "tiny-aya-fire")
-        & (single["unsteered"]["attack"] == "plain")]
-    single["steered"] = single["steered"][single["steered"]["attack"].str.startswith("cast")]
+    # Single-turn rates on the same prompts, for comparison. The judged CSVs are not
+    # in the repository (they hold answers), so read the public redacted logs, whose
+    # verdicts are identical.
+    logs = "kd1609/hinglish-safety-eval-logs"
+    base = load_dataset(logs, "baseline_test", split="train").to_pandas()
+    steer = load_dataset(logs, "steering_test", split="train").to_pandas()
+    single = {"unsteered": base[(base["model"] == "tiny-aya-fire") & (base["attack"] == "plain")],
+              "steered": steer[steer["attack"].str.startswith("cast")]}
 
     rows = []
     for (variant, lang), g in esc.groupby(["variant", "language"]):
