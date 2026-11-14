@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 # colab_run.py runs Phase 6 then Phase 5 and uploads results after every step.
-PHASE = "colab_run.py 5"
+PHASE = "colab_run.py 7"
 REPO = "https://github.com/kdt523/safety-doesnt-translate.git"
 WORK = "/kaggle/working"
 PROJECT = "/tmp/project"

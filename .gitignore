@@ -29,3 +29,4 @@ results/**/*generations*.csv
 !results/phase5_*summary*
 !results/phase5_bestofn*
 !results/phase5_library_probes.csv
+!results/phase7_*summary*

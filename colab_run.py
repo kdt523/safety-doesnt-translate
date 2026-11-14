@@ -17,8 +17,9 @@ PHASE6 = ["python phase6_multiturn.py generate",
 PHASE5 = ["python phase5_robustness.py generate",
           "python phase2_baseline_eval.py judge bestofn phase5",
           "python bestofn_summary.py results/phase5_judged.csv results/phase5"]
+PHASE7 = ["python phase7_extra.py generate", "python phase7_extra.py judge"]
 # `python colab_run.py 6` or `5` runs one phase (two jobs in parallel); no argument runs both.
-STEPS = {"6": PHASE6, "5": PHASE5}.get(sys.argv[1] if len(sys.argv) > 1 else "", PHASE6 + PHASE5)
+STEPS = {"6": PHASE6, "5": PHASE5, "7": PHASE7}.get(sys.argv[1] if len(sys.argv) > 1 else "", PHASE6 + PHASE5)
 
 
 def upload(note):
@@ -26,7 +27,7 @@ def upload(note):
     api = HfApi()
     api.create_repo(RESULTS_REPO, repo_type="dataset", private=True, exist_ok=True)
     api.upload_folder(folder_path="results", repo_id=RESULTS_REPO, repo_type="dataset",
-                      allow_patterns=["phase5_*", "phase6_*"], commit_message=note)
+                      allow_patterns=["phase5_*", "phase6_*", "phase7_*"], commit_message=note)
     print(f"uploaded results after: {note}", flush=True)
 
 
