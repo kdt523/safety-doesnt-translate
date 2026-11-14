@@ -9,8 +9,8 @@ import shutil
 import subprocess
 import sys
 
-PHASE = ("phase5_robustness.py generate && python phase2_baseline_eval.py judge bestofn phase5"
-         " && python bestofn_summary.py results/phase5_judged.csv results/phase5")
+# colab_run.py runs Phase 6 then Phase 5 and uploads results after every step.
+PHASE = "colab_run.py"
 REPO = "https://github.com/kdt523/safety-doesnt-translate.git"
 WORK = "/kaggle/working"
 PROJECT = "/tmp/project"
@@ -52,6 +52,7 @@ try:
         from kaggle_secrets import UserSecretsClient
         token = UserSecretsClient().get_secret("HF_TOKEN")
     login(token)
+    os.environ["HF_TOKEN"] = token   # for child scripts that log in themselves
     print("Logged in to Hugging Face")
 except Exception as e:
     print(f"HF login failed (add the private hf-token dataset): {e}")
