@@ -85,7 +85,8 @@ harassment/bullying 19.
 - **Automated screening** of all 1,347 non-English rows (empty, untranslated, wrong
   script, extreme length, lost sentence ending, no shared terms): Hindi 100% pass,
   Marathi 100% pass, Hinglish 94.7% pass. 24 Hinglish rows were flagged for review.
-- **Human review:** not yet completed. <!-- TODO: replace with the spot-check result -->
+- **Human review:** not completed. The 24 flagged rows are kept and listed in the
+  project repository (`review/flagged_rows.xlsx`) for review.
 - Automated checks catch structural faults, not drift in meaning. A translation can
   pass every check and still soften a word (for example a violent verb rendered as a
   milder one), which matters most for the harmless-but-scary half.

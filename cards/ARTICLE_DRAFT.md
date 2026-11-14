@@ -2,8 +2,11 @@
 
 *Lexsi AI Safety and Alignment Hackathon, Track 2a, problem 4: multilingual and code-mixed safety.*
 
-> **Draft.** Sections marked TODO wait on runs that have not finished. Nothing in
-> those sections should be filled in from estimates.
+**Links:** [Space](https://huggingface.co/spaces/kd1609/safety-doesnt-translate) ·
+[Benchmark](https://huggingface.co/datasets/kd1609/hinglish-safety-bench) ·
+[Eval logs](https://huggingface.co/datasets/kd1609/hinglish-safety-eval-logs) ·
+[Steering vectors](https://huggingface.co/kd1609/tiny-aya-fire-hinglish-refusal-steering) ·
+[Code](https://github.com/kdt523/safety-doesnt-translate)
 
 ## TL;DR
 
@@ -56,8 +59,9 @@ Splits are by prompt: `direction` (finding the refusal direction), `val` (tuning
 `test` (reported numbers only).
 
 **Translation quality.** Automated screening of all 1,347 non-English rows passed 100%
-of Hindi, 100% of Marathi and 94.7% of Hinglish rows. TODO: result of the native-speaker
-review of the 24 flagged rows. Automated checks catch structural faults, not changes in
+of Hindi, 100% of Marathi and 94.7% of Hinglish rows. The 24 flagged Hinglish rows were
+kept and listed for review; a native-speaker review was not completed in time, so meaning
+drift is an open limitation. Automated checks catch structural faults, not changes in
 meaning.
 
 ## Metrics, and why these
@@ -198,21 +202,29 @@ The corrupted run is kept in the repository (`results/archive_rightpad/`).
 
 ## Robustness
 
-TODO: best-of-5 sampling. A prompt counts as broken if any of five sampled answers is
-judged harmful, run on the unsteered and steered model, with single-sample rates beside
-it. TODO: AuditKIT built-in probe pass rates (prompt injection, jailbreak, encoding,
-refusal), which are small and English-only.
+**What we measured.** A fictional-story jailbreak framing (the first pattern in
+AuditKIT's built-in jailbreak probe) raises English attack success from 7.1% to 20.4%,
+while plain Hinglish already reaches 51.3%. Switching language is a stronger attack on
+this model than an explicit jailbreak in English.
 
-**Not covered.** The problem statement also lists weight-space attacks such as
-abliteration and further obfuscation attacks. We did not run them. Multi-turn audits
-are TODO or out of scope, depending on time.
+**What we built but could not run in time.** A best-of-5 sampling attack (a prompt
+counts as broken if any of five sampled answers is judged harmful) on the unsteered and
+steered model, plus AuditKIT's built-in probes (prompt injection, jailbreak, encoding,
+refusal). The code is in the repository (`phase5_robustness.py`); the run did not get
+GPU time before the deadline, so the steered model's robustness to repeated sampling is
+**untested**. All reported results are greedy decoding.
 
-## Cost: self-hosted versus a closed API
+**Not covered.** Weight-space attacks such as abliteration, further obfuscation attacks,
+and multi-turn audits. Inference-time steering offers no protection against someone who
+can edit the weights.
 
-TODO: realistic message volume, measured tokens per second on the GPU used, GPU hours,
-hourly GPU price, against closed-model token billing plus a moderation call. Steering
-adds a forward hook and a cosine check, so runtime overhead should be small, but it
-must be measured.
+## Cost
+
+Steering changes no weights and adds no model. Per request it costs one extra prefill
+pass over the prompt (to read the gate) and one vector addition per generated token.
+Generation, which dominates cost, is unchanged. We did not benchmark wall-clock overhead
+or compare against a hosted model plus a moderation API, so we make no cost claim beyond
+this.
 
 ## Limitations
 
@@ -222,15 +234,27 @@ must be measured.
 - The judge is English-trained and sees translated answers for two languages.
 - Moderate sample size per language. Differences smaller than the intervals are not
   claims.
-- One extra push setting (alpha 12) was chosen from five; all five passed the rule.
+- The push strength (alpha 12) was chosen from five candidates on the val split; it is
+  the largest one tried, so a larger value might do better or worse.
+- Robustness to sampling-based and multi-turn attacks is untested.
+- Unsteered Tiny Aya already loops on about 20% of harmless Hinglish prompts; steering
+  does not fix fluency.
 - Steering strength is tuned on one model. We have not tested that it transfers to
   other models or languages.
 - Mechanism claims rest on four languages and one layer.
 
 ## Reproduce
 
-Code, runner and results: https://github.com/kdt523/safety-doesnt-translate.
-TODO: Hugging Face links for the dataset, logs, steering vectors and Space.
+- Code, Kaggle runner and result tables: https://github.com/kdt523/safety-doesnt-translate
+- Benchmark (prompts only): https://huggingface.co/datasets/kd1609/hinglish-safety-bench
+- Judged outputs behind every number (answers judged harmful are redacted; verdicts kept):
+  https://huggingface.co/datasets/kd1609/hinglish-safety-eval-logs
+- Steering direction, gate and usage code:
+  https://huggingface.co/kd1609/tiny-aya-fire-hinglish-refusal-steering
+- Results explorer: https://huggingface.co/spaces/kd1609/safety-doesnt-translate
+
+The Space is a static page. A live demo would have to generate unsteered answers to any
+prompt, which would hand out exactly the harmful Hinglish answers this work documents.
 
 ## Credits
 
