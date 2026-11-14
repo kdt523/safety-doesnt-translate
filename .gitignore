@@ -20,3 +20,12 @@ kaggle/out*/
 
 # Kaggle API keys
 kaggle.json
+
+# Raw generations hold unredacted answers: never commit them. Judged files are
+# committed only after harmful answers are redacted.
+results/**/*generations*.csv
+!results/phase6_*summary*
+!results/phase6_injection.csv
+!results/phase5_*summary*
+!results/phase5_bestofn*
+!results/phase5_library_probes.csv
