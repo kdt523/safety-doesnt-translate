@@ -84,7 +84,8 @@ def _decoder_layers(model):
 def encode(tok, prompts, device):
     if tok.padding_side != "left":
         raise ValueError("batched generation needs left padding (see common.load_model)")
-    chats = [[{"role": "user", "content": p}] for p in prompts]
+    # A prompt is a string (one user turn) or a full message list (multi-turn, Phase 6).
+    chats = [p if isinstance(p, list) else [{"role": "user", "content": p}] for p in prompts]
     return tok.apply_chat_template(chats, add_generation_prompt=True, padding=True,
                                    return_dict=True, return_tensors="pt").to(device)
 

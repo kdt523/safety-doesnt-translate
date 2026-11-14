@@ -35,7 +35,7 @@ LOGS = f"{HF_USER}/hinglish-safety-logs"
 N_SAMPLES = 5
 TEMPERATURE = 1.0
 TOP_P = 0.95
-SEEDS_PER_LANGUAGE = 50       # harmful prompts per language; keeps the run affordable
+SEEDS_PER_LANGUAGE = 30       # harmful prompts per language; keeps the run affordable
 MAX_NEW_TOKENS = 128          # compliance shows up early; full length is not needed
 PROBE_MAX_NEW_TOKENS = 200
 
