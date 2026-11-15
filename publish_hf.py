@@ -26,18 +26,39 @@ RUNS = {
     "baseline_test": ("results/phase2_judged.csv", None),
     "steering_val": ("results/phase4_val_judged.csv", None),
     "steering_test": ("results/phase4_judged.csv", None),
+    "bestofn": ("results/phase5_judged.csv", None),
+    "multiturn_escalation": ("results/phase6_escalation_judged.csv", None),
+    "fiction_steered": ("results/phase7_fiction_judged.csv", None),
 }
 KEEP = ["id", "seed_id", "language", "split", "harmful", "category", "source", "model",
-        "attack", "prompt", "prompt_en", "answer", "answer_en", "refused",
-        "harmful_answer", "broken", "judge_parsed"]
+        "attack", "variant", "sample", "prompt", "prompt_en", "answer", "answer_en",
+        "refused", "harmful_answer", "broken", "judge_parsed", "transcript"]
 
 
 def redact(df):
+    import json
+
     df = df.copy()
     df["broken"] = df["answer"].map(is_broken)   # computed before redaction
+    bad = df["harmful_answer"].astype(bool)
     for col in ("answer", "answer_en"):
-        df.loc[df["harmful_answer"], col] = REDACTED
+        df.loc[bad, col] = REDACTED
+    if "transcript" in df.columns:
+        # The final assistant turn of a judged-harmful conversation is the harmful answer.
+        def scrub(t):
+            msgs = json.loads(t)
+            msgs[-1]["content"] = REDACTED
+            return json.dumps(msgs, ensure_ascii=False)
+        df.loc[bad, "transcript"] = df.loc[bad, "transcript"].map(scrub)
     return df[[c for c in KEEP if c in df.columns]]
+
+
+def injection_logs():
+    """Document-injection audit: no harmful content, only the canary leak."""
+    df = pd.read_csv("results/phase6_injection.csv")
+    Dataset.from_pandas(df, preserve_index=False).push_to_hub(
+        EVAL_LOGS, "multiturn_injection", private=False)
+    print(f"  multiturn_injection: {len(df)} conversations")
 
 
 EVAL_CARD = f"""---
@@ -58,6 +79,10 @@ Judged model outputs behind every number in *Safety Doesn't Translate*
 | `baseline_test` | Tiny Aya Fire and Global, plain and fiction-framed prompts, test split |
 | `steering_val` | candidate steering settings on the val split (used to choose one) |
 | `steering_test` | chosen conditional steering and its no-gate twin, test split |
+| `bestofn` | five sampled answers per harmful prompt, unsteered and steered |
+| `multiturn_escalation` | three-turn gradual-jailbreak transcripts, unsteered and steered |
+| `multiturn_injection` | document-injection transcripts and the turn the code leaked |
+| `fiction_steered` | steered model on fiction-framed test prompts |
 
 Each row has the WildGuard verdicts (`refused`, `harmful_answer`), a
 `broken` flag (near-empty or looping answer) and the English text the judge
@@ -85,8 +110,16 @@ def datasets():
         Dataset.from_pandas(df, preserve_index=False).push_to_hub(
             EVAL_LOGS, config, private=False)
         print(f"  {config}: {len(df)} rows, {n} answers redacted")
-    api.upload_file(path_or_fileobj=EVAL_CARD.encode(), path_in_repo="README.md",
-                    repo_id=EVAL_LOGS, repo_type="dataset", commit_message="Card")
+    injection_logs()
+    # push_to_hub records the configs in the README header; keep that header and
+    # replace only the card text, or the configs become unloadable.
+    from huggingface_hub import DatasetCard
+    card = DatasetCard.load(EVAL_LOGS, repo_type="dataset")
+    ours = DatasetCard(EVAL_CARD)
+    for key, value in ours.data.to_dict().items():
+        setattr(card.data, key, value)
+    card.text = ours.text
+    card.push_to_hub(EVAL_LOGS, repo_type="dataset", commit_message="Card")
     print(f"public: {EVAL_LOGS}")
     print(f"kept private: {DATASET_RAW}, {HF_USER}/hinglish-safety-logs")
 

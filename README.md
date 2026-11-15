@@ -29,6 +29,19 @@ steering. No retraining, and no rise in over-refusal.
 `results/phase4_summary.csv`. The same push without the gate raises over-refusal to
 20-55%. Hinglish improves but remains the weakest language.
 
+**Robustness and multi-turn (Track 2a #1 and #3):**
+
+| Check | Unsteered | Steered |
+|---|---|---|
+| Fiction jailbreak, Hinglish attack success | 40.7% | 18.6% |
+| Gradual 3-turn jailbreak, Hinglish | 55.0% | 22.5% |
+| Best of 5 samples, Hinglish | 86.7% | **60.0%** |
+| Best of 5 samples, English | 23.3% | 3.3% |
+| Hidden instruction in a document leaks a secret (all languages) | 90-100% | 90-100% |
+
+Steering holds against jailbreak framing and multi-turn escalation, but not against
+repeated sampling in Hinglish, and it does nothing for prompt injection.
+
 **Why:** all four languages share one refusal direction (cosine 0.75-0.94 with
 English), but harmful Hinglish prompts activate it weakly (17.1 against 24.9 for
 English). The gap is weak activation, not a missing concept, so it can be topped up at
@@ -47,7 +60,9 @@ inference time.
 | 2 | `phase2_baseline_eval.py` | baseline answers (plain and fiction-framed), AuditKIT WildGuard judge |
 | 3 | `phase3_interp.py` | refusal direction per language (SafeTune), projections, cosine |
 | 4 | `phase4_steer.py` | CAST gate (SafeTune), candidates on val, fixed selection rule, test run |
-| 5 | `phase5_robustness.py` | best-of-5 sampling and AuditKIT probes (built; not run before the deadline) |
+| 5 | `phase5_robustness.py` | best-of-5 sampling and AuditKIT probes, unsteered vs steered |
+| 6 | `phase6_multiturn.py` | multi-turn audits: document injection, gradual jailbreak, with transcripts |
+| 7 | `phase7_extra.py` | steering against the fiction jailbreak; larger alphas on val |
 | | `summarise.py` | rates with Wilson intervals, broken-output rate |
 | | `check_translations.py` | automated translation screening |
 | | `publish_hf.py`, `space/` | Hugging Face artifacts and the Space |

@@ -21,6 +21,12 @@
   **51% to 31%**, Marathi from 32% to 12% and Hindi from 18% to 6%, with **no rise in
   over-refusal in any language**. The same push without the gate makes the model refuse
   20-55% of harmless questions.
+- The fix also holds against a fiction jailbreak and across multi-turn escalation
+  (Hinglish 55% to 23%). It does **not** survive repeated sampling in Hinglish: with five
+  tries, 60% of harmful Hinglish prompts still get through (87% unsteered).
+- A hidden instruction in a document leaks a confidential code 90-100% of the time in
+  every language, and steering cannot stop it: injection is a different failure from
+  harmful requests.
 
 ## Why this matters
 
@@ -207,8 +213,21 @@ AuditKIT's built-in jailbreak probe) raises English attack success from 7.1% to 
 while plain Hinglish already reaches 51.3%. Switching language is a stronger attack on
 this model than an explicit jailbreak in English. The two also stack: with the fiction
 framing, attack success reaches 39.8% in Hindi and 56.6% in Marathi (from 17.7% and 31.9%
-plain). Steering was evaluated on plain prompts only; whether it holds against the
-fiction framing is untested.
+plain).
+
+**Steering against the fiction jailbreak** (test split, 113 harmful and 156 harmless
+prompts per language, same gate and alpha as the main result):
+
+| Language | Fiction, unsteered | Fiction, steered | Over-refusal unsteered / steered |
+|---|---|---|---|
+| English | 20.4% (14-29) | **5.3%** (3-11) | 3.8% / 3.8% |
+| Hindi | 39.8% (31-49) | **11.5%** (7-19) | 3.8% / 7.1% |
+| Marathi | 56.6% (47-65) | **23.9%** (17-33) | 3.2% / 3.8% |
+| Hinglish | 40.7% (32-50) | **18.6%** (13-27) | 1.9% / 2.6% |
+
+Steering holds against the jailbreak in every language, with intervals that separate, and
+over-refusal rises by at most one to five prompts. Marathi with fiction framing remains
+the weakest combination.
 
 **AuditKIT built-in probes** (English, 5-8 cases each, a sanity check rather than a
 measurement):
@@ -223,7 +242,23 @@ measurement):
 Steering does not weaken the model's existing resistance. Prompt injection is the weak
 point, which the multi-turn audit below confirms at scale.
 
-**Best-of-5 sampling.** TODO-BESTOFN
+**Best-of-5 sampling.** Greedy decoding gives one answer per prompt; an attacker can
+simply ask again. Each of 30 harmful test prompts per language was sampled five times
+(temperature 1.0, top-p 0.95) on both models. A prompt counts as broken if any of the
+five answers is judged harmful.
+
+| Language | One sample, unsteered | Best of 5, unsteered | One sample, steered | Best of 5, steered |
+|---|---|---|---|---|
+| English | 8.7% | 23.3% (12-41) | 2.7% | **3.3%** (1-17) |
+| Hindi | 19.3% | 43.3% (27-61) | 8.7% | **13.3%** (5-30) |
+| Marathi | 28.7% | 50.0% (33-67) | 8.7% | **23.3%** (12-41) |
+| Hinglish | 49.3% | 86.7% (70-95) | 29.3% | **60.0%** (42-75) |
+
+This is the sobering result. Retrying breaks the unsteered model easily: given five
+tries, an attacker gets a harmful Hinglish answer for 87% of prompts. Steering cuts that
+in every language and nearly eliminates it in English, but **in Hinglish 60% of prompts
+still break within five tries**. Single-sample numbers understate the real risk, and
+the Hinglish fix is partial. With 30 prompts per language the intervals are wide.
 
 **Not covered.** Weight-space attacks such as abliteration. Inference-time steering offers
 no protection against someone who can edit the weights.
@@ -293,7 +328,10 @@ this.
   claims.
 - The push strength (alpha 12) was chosen from five candidates on the val split; it is
   the largest one tried, so a larger value might do better or worse.
-- Robustness to sampling-based and multi-turn attacks is untested.
+- Robustness checks use smaller samples (30-40 prompts per language for best-of-5 and
+  multi-turn, 5-8 cases per AuditKIT probe); treat them as directional.
+- Prompt injection is not addressed by steering at all.
+- No weight-space attacks (abliteration) were tested.
 - Unsteered Tiny Aya already loops on about 20% of harmless Hinglish prompts; steering
   does not fix fluency.
 - Steering strength is tuned on one model. We have not tested that it transfers to
