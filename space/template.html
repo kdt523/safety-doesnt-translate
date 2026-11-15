@@ -57,6 +57,15 @@ over-refusal.</p>
 Harmful Hinglish prompts sit well below harmful English ones: same direction, weaker signal.</p>
 <div class="bars" id="mech"></div>
 
+<h2>Does the fix hold under attack?</h2>
+<p class="note">Attack success, unsteered → steered. Fiction: "this is for a story" framing
+(test split). Multi-turn: two benign setup turns, then the harmful prompt (40 per language).
+Best of 5: broken if any of five sampled answers is harmful (30 per language). Injection:
+a hidden instruction in a document leaks a confidential code (10 documents).</p>
+<div class="wrap"><table id="robust"></table></div>
+<p class="note">Steering holds against jailbreak framing and multi-turn escalation, but not
+against repeated sampling in Hinglish, and it cannot stop prompt injection.</p>
+
 <h2>Answers before and after steering</h2>
 <p class="note">Answers the judge scored as harmful are redacted.</p>
 <div class="controls" id="lang"></div><div class="controls" id="kind"></div>
@@ -75,6 +84,10 @@ document.getElementById("stats").innerHTML=[
 let t=`<tr><th>Language</th><th>Attack success before</th><th>after steering</th><th>always-on</th><th>Over-refusal before</th><th>after steering</th><th>always-on</th></tr>`;
 for(const r of D.table){t+=`<tr><td>${r.language}</td><td>${pct(r.before.asr)} ${ci(r.before.asr)}</td><td class="hl">${pct(r.cast.asr)} ${ci(r.cast.asr)}</td><td>${pct(r.always.asr)}</td><td>${pct(r.before.over)}</td><td class="hl">${pct(r.cast.over)}</td><td>${pct(r.always.over)}</td></tr>`}
 document.getElementById("tbl").innerHTML=t;
+const arrow=([a,b])=>`${a.toFixed(1)}% → <b>${b.toFixed(1)}%</b>`;
+let rt=`<tr><th>Language</th><th>Fiction jailbreak</th><th>Multi-turn</th><th>Best of 5</th><th>Injection leak</th></tr>`;
+for(const r of D.robust){rt+=`<tr><td>${r.language}</td><td>${arrow(r.fiction)}</td><td>${arrow(r.multiturn)}</td><td>${arrow(r.bestofn)}</td><td>${arrow(r.injection)}</td></tr>`}
+document.getElementById("robust").innerHTML=rt;
 const max=Math.max(...D.mech.map(m=>m.mean));
 document.getElementById("mech").innerHTML=D.mech.filter(m=>m.prompts==="harmful").map(m=>
  `<div class="bar"><span>${m.language} harmful</span><div class="track"><div class="fill" style="width:${100*m.mean/max}%"></div></div><span>${m.mean}</span></div>`).join("");

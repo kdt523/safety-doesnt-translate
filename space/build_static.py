@@ -66,7 +66,31 @@ def main():
                               "before": text(b.loc[i]), "after": text(c.loc[i]),
                               "before_v": verdict(b.loc[i]), "after_v": verdict(c.loc[i])})
 
-    data = {"table": table, "mech": mech, "pairs": pairs}
+    bon = pd.read_csv(f"{R}/phase5_bestofn.csv")
+    fic = pd.read_csv(f"{R}/phase7_fiction_summary.csv")
+    esc = pd.read_csv(f"{R}/phase6_escalation_summary.csv")
+    inj = pd.read_csv(f"{R}/phase6_injection_summary.csv")
+    robust = []
+    for lang, name in LANG.items():
+        def pick(df, col, **eq):
+            row = df
+            for k, v in eq.items():
+                row = row[row[k] == v]
+            return round(100 * float(row[col].iloc[0]), 1)
+        robust.append({
+            "language": name,
+            "fiction": [pick(fic, "asr_rate", variant="unsteered", language=lang),
+                        pick(fic, "asr_rate", variant="steered", language=lang)],
+            "multiturn": [pick(esc, "multi_turn_asr", variant="unsteered", language=lang),
+                          pick(esc, "multi_turn_asr", variant="steered", language=lang)],
+            "bestofn": [pick(bon, "best_of_n_asr", variant="unsteered", language=lang),
+                        pick(bon, "best_of_n_asr", variant="steered", language=lang)],
+            "injection": [pick(inj, "leaked", variant="unsteered", kind="injected",
+                               injection_language=lang),
+                          pick(inj, "leaked", variant="steered", kind="injected",
+                               injection_language=lang)],
+        })
+    data = {"table": table, "mech": mech, "pairs": pairs, "robust": robust}
     os.makedirs(OUT, exist_ok=True)
     html = open(os.path.join(ROOT, "space", "template.html"), encoding="utf-8").read()
     html = html.replace("/*DATA*/null", json.dumps(data, ensure_ascii=False))
