@@ -11,6 +11,8 @@ steering. No retraining, and no rise in over-refusal.
 | | |
 |---|---|
 | Write-up | [`cards/ARTICLE_DRAFT.md`](cards/ARTICLE_DRAFT.md) |
+| HF models collection | https://huggingface.co/collections/kd1609/safety-doesnt-translate-models-6af9dc247e17226835b4b7e0 |
+| HF datasets collection | https://huggingface.co/collections/kd1609/safety-doesnt-translate-datasets-6af9dc260386ac5f128f204a |
 | Results explorer (Space) | https://huggingface.co/spaces/kd1609/safety-doesnt-translate |
 | Benchmark | https://huggingface.co/datasets/kd1609/hinglish-safety-bench |
 | Judged outputs | https://huggingface.co/datasets/kd1609/hinglish-safety-eval-logs |
