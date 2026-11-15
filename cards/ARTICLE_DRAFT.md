@@ -183,6 +183,17 @@ Wilson intervals.
 - **Hinglish is not fixed.** Steering closes about 45% of its gap to English. It remains
   the weakest language.
 
+**Where the remaining failures come from.** On the test split the gate fires on 95-99% of
+harmful prompts in every language and on 1.9% of harmless ones (inferred from which
+steered answers differ from the unsteered ones). Every harmful prompt that still got
+through, all 35 in Hinglish, was one the gate *did* steer. Pushing harder does not help:
+on the val split Hinglish attack success goes 25.6% at alpha 12, 23.3% at 16 and 23.3% at
+20, while broken answers start to rise at 20 (5.2% against 0.6% unsteered). The
+bottleneck is the steering direction, not the gate or the strength: one direction taken
+from English prompts at one layer does not flip about a quarter of Hinglish requests.
+Natural next steps are a direction extracted from code-mixed prompts, or steering at
+several layers.
+
 ## Getting the evaluation right
 
 Our first steering run looked like a different result: attack success fell, but
@@ -326,8 +337,8 @@ this.
 - The judge is English-trained and sees translated answers for two languages.
 - Moderate sample size per language. Differences smaller than the intervals are not
   claims.
-- The push strength (alpha 12) was chosen from five candidates on the val split; it is
-  the largest one tried, so a larger value might do better or worse.
+- The push strength (alpha 12) was chosen on the val split. A follow-up at alpha 16 and 20
+  showed diminishing returns, so the test setting was not changed.
 - Robustness checks use smaller samples (30-40 prompts per language for best-of-5 and
   multi-turn, 5-8 cases per AuditKIT probe); treat them as directional.
 - Prompt injection is not addressed by steering at all.
