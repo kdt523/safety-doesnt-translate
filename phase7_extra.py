@@ -88,5 +88,21 @@ def judge():
     print(p4.pooled(alpha).to_string(float_format="{:.3f}".format))
 
 
+def judge_alpha():
+    """Judge only the larger-alpha val answers (the fiction run is judged already)."""
+    import phase2_baseline_eval as p2
+    import phase4_steer as p4
+    from huggingface_hub import hf_hub_download
+    from summarise import summarise, write
+
+    src = hf_hub_download("kd1609/lexsi-run-results", "phase7_alpha_generations.csv",
+                          repo_type="dataset")
+    alpha = p2.judge_frame(pd.read_csv(src))
+    alpha.to_csv("results/phase7_alpha_judged.csv", index=False)
+    write(summarise(alpha, ["attack", "language"]), "results/phase7_alpha_summary",
+          "Val split: CAST at larger alphas")
+    print(p4.pooled(alpha).to_string(float_format="{:.3f}".format))
+
+
 if __name__ == "__main__":
-    {"generate": generate, "judge": judge}[sys.argv[1]]()
+    {"generate": generate, "judge": judge, "judge_alpha": judge_alpha}[sys.argv[1]]()

@@ -19,7 +19,7 @@ PHASE5 = ["python phase5_robustness.py generate",
           "python bestofn_summary.py results/phase5_judged.csv results/phase5"]
 PHASE7 = ["python phase7_extra.py generate", "python phase7_extra.py judge"]
 # `python colab_run.py 6` or `5` runs one phase (two jobs in parallel); no argument runs both.
-STEPS = {"6": PHASE6, "5": PHASE5, "7": PHASE7}.get(sys.argv[1] if len(sys.argv) > 1 else "", PHASE6 + PHASE5)
+STEPS = {"6": PHASE6, "5": PHASE5, "7": PHASE7, "7a": ["python phase7_extra.py judge_alpha"]}.get(sys.argv[1] if len(sys.argv) > 1 else "", PHASE6 + PHASE5)
 
 
 def upload(note):
