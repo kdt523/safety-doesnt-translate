@@ -30,3 +30,9 @@ results/**/*generations*.csv
 !results/phase5_bestofn*
 !results/phase5_library_probes.csv
 !results/phase7_*summary*
+
+# Judged answer files from Phase 5+ are unredacted: never commit (redacted copies are on the Hub).
+results/phase5_judged.csv
+results/phase6_*judged*.csv
+results/phase7_*judged*.csv
+results/phase7_*generations*.csv
